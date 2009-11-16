@@ -81,7 +81,6 @@ var metaworker = function(options){
 			chunks.push(options.work.splice(0,slice_size));
 		}
 
-		var finished = false;
 		var numTotalChunks = chunks.length;
 		var numReturnedChunks = 0;
 		var reducedChunks = [];
