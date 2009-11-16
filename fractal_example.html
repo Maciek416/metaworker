@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>metaworker examples - mandelbrot fractal</title>
+	</head>
+	<body style="background-color:#fff">
+		<h1>metaworker examples - mandelbrot fractal</h1>
+		<pre id="counter"></pre>
+		<canvas id="canv" width="512" height="512" style="border:7px solid black;"></canvas>
+	</body>
+	<script type="text/javascript" src="metaworker_lib.js"></script>
+	<script type="text/javascript">
+
+		var mandelRow = function(work) {
+			var results = [];
+			for(var w=0;w<work.length;w++){
+				var config = work[w];
+
+				var x = config.x;
+				var y = config.y;
+				var width = config.width;
+				var maxiterations = config.maxiterations;
+				var dx = config.dx;
+
+				var pixels = [];
+				for(var i = 0; i < width; i++){
+					var a = x;
+					var b = y;
+					var n = 0;
+					while (n < maxiterations){
+						var aa = a * a;
+						var bb = b * b;
+						var twoab = 2 * a * b;
+						a = aa - bb + x;
+						b = twoab + y;
+						if (aa + bb > 16){
+							break;
+						}
+						n++;
+					}
+					if(n==maxiterations){
+						pixels.push([0,0,0]);
+					} else {
+						// pixels.push([Math.round(n * 16 % 255), Math.round(n * 16 % 255), Math.round(n * 16 % 255)]);
+						var r = Math.floor(n * 1600 % 255);
+						var g = Math.floor(n * 3200 % 255);
+						var b = Math.floor(n * 6400 % 255);
+						pixels.push([r,g,b]);
+					}
+					x += dx;
+				}
+				results.push({
+					pixels:pixels,
+					rowIndex:config.j
+				});
+			}
+			return results;
+		};
+		
+		var drawSubresult = function(rows){
+			var canvas = document.getElementById('canv');
+			if (canvas.getContext){
+				var ctx = canvas.getContext('2d');
+				for(var i=0;i<rows.length;i++){
+					var row = rows[i];
+					var y = row.rowIndex;
+					var pixels = row.pixels;
+					for(var x=0;x<pixels.length;x++){
+						ctx.fillStyle = 'rgb(' + pixels[x][0] + ',' + pixels[x][1] + ',' + pixels[x][2] + ')';
+						ctx.fillRect (x, y, 1, 1);
+					}
+				}
+			}
+		};
+		
+		var drawResults = function(rows){
+			var canvas = document.getElementById('canv');
+			if (canvas.getContext){
+				var ctx = canvas.getContext('2d');
+				for(var y=0;y<rows.length;y++){
+					for(var x=0;x<rows[y].length;x++){
+						ctx.fillStyle = 'rgb(' + rows[y][x][0] + ',' + rows[y][x][1] + ',' + rows[y][x][2] + ')';
+						ctx.fillRect (x, y, 1, 1);
+					}
+				}
+			}
+		};
+
+
+
+		var rows = [];
+
+		var width = 512;
+		var height = 512;
+		var xmin = -2.45;
+		var ymin = -2;
+		var xmax = width;
+		var ymax = height;
+		var wh = 4;
+		var maxiterations = 50;
+		var xmax = xmin + wh;
+		var ymax = ymin + wh;
+		var dx = (xmax - ymin) / width;
+		var dy = (ymax - ymin) / height;
+		var work = [];
+
+		//
+		// Create some work
+		//
+		var y = ymin;
+		for(var j = 0; j < height; j++){
+			work.push({
+				width:width,
+				maxiterations:maxiterations,
+				x:xmin,
+				y:y,
+				dx:dx,
+				j:j
+			});
+			y = y + dy;
+		}
+		
+		var counter = 0;
+		setInterval(function(){
+			document.getElementById("counter").innerHTML = counter;
+			counter++;
+		},250);
+		
+		var received_work_count = 0;
+		for(var i=0;i<work.length;i++){
+			metaworker({
+				mapper: mandelRow,
+				reducer: function(existing_results, intermediate_results){
+					console.log("reducer input is of length",intermediate_results.length);
+					var d = new Date();
+					var startTime = d.getTime();
+					
+					//
+					// reducer receives work results from workers and just concatenates them
+					// intermediate results looks like this:
+					//
+					// [[rowresult,rowresult,rowresult], [rowresult,rowresult,rowresult], ..]
+					//
+					// we want to output:
+					//
+					// [rowresult,rowresult,rowresult, rowresult,rowresult,rowresult, ..]
+					//
+					// as if the entire process had been done by a single thread
+					//
+
+					var rd = new Date();
+					var rstartTime = rd.getTime();
+					for(var i=0;i<intermediate_results.length;i++){
+						drawSubresult(intermediate_results[i]);
+					}
+					var rd2 = new Date();
+					var rendTime = rd2.getTime();
+					console.log("Renderer took ",((rendTime-rstartTime)),"ms to render ",intermediate_results.length," rows");
+
+					for(var i=0;i<intermediate_results.length;i++){
+						if(intermediate_results[i].length > 0){
+							for(var ir=0;ir<intermediate_results[i].length;ir++){
+								existing_results.push(intermediate_results[i][ir]);
+							}
+						}
+					}
+					var d2 = new Date();
+					var endTime = d2.getTime();
+					// console.log("Reducer took ",((endTime-startTime)),"ms");
+					console.log("reducer out is of length",existing_results.length);
+
+					return existing_results;
+				},
+				parallel: true,
+				work: work,
+				callback:function(result){
+					// result is a mandelbrot
+					console.log("Callback received resulting mandelbrot rendering ",result.length," rows in length.");
+				}
+			});
+		}		
+
+
+	</script>
+</html>

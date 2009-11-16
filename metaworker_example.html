@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>  
+	<head>
+		<title>metaworker examples - simple adder</title>
+	</head>
+	<script type="text/javascript" src="metaworker_lib.js"></script>
+	<body>
+
+		<h1>metaworker examples - simple adder</h1>
+		<pre id="results">Please wait.. workers are calculating</pre>
+
+		<script language="javascript">
+
+			var mapper = function(items){
+				var id = Math.round(Math.random() * 10000);
+				console.log(id+"#mapper got items:",items);
+				var result = 0;
+				for(var i=0;i<items.length;i++){
+					result = result + items[i];
+				}
+				console.log(id+"#mapper returning:",result);
+				return result;
+			};
+
+			var reducer = function(intermediate_aggregate, new_results){
+				var result;
+				if(intermediate_aggregate.length > 0){
+					// we need to add to an intermediate sum from another reducer
+					result = intermediate_aggregate[0];
+				} else {
+					// bootstrap reduction
+					result = 0;
+				}
+				for(var i=0;i<new_results.length;i++){
+					result += new_results[i];
+				}
+				return [ result ];
+			};
+
+			var work = [];
+			for(var i=0;i<1000;i++){
+				work.push(i);
+			}
+
+			// as it happens, mapping and reducing is the same operation here
+			metaworker({
+				mapper: mapper,
+				reducer: reducer,
+				work: work,
+				parallel:true,
+				callback: function(result){
+					document.getElementById("results").innerHTML = "";
+					document.getElementById("results").appendChild(document.createElement("br"));
+					document.getElementById("results").appendChild(document.createTextNode("Got back result:" + result));
+				}
+			});
+
+
+		</script>  
+	</body>  
+</html>  
