@@ -1,0 +1,8 @@
+metaworker
+==========
+
+NOTE: In its alpha state, metaworker has the capacity to crash your browser, and crash it hard. Please make sure you know what you're doing when using this library :)
+
+metaworker is a simple library which wraps around HTML5 web workers. It allows you to use worker threads without worrying too much about the details of the worker spec. Some other convenience functions are provided.
+
+Please see the included examples for usage.
