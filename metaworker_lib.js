@@ -26,7 +26,6 @@
 //
 // TODO:
 //
-//  * make only a small number of threads execute at a time, and have a dispatcher assign work
 //  * we need an example that does word counts
 //  * allow user to control number of simultaneous threads
 //  * allow user to control work chunk size
@@ -41,7 +40,7 @@
 
 var metaworker = function(options){
 	var path = "";
-	var activeSubworkers = 0;
+	var activeMappers = 0;
 
 	if(typeof(options.workerpath)=='string' || options.workerpath instanceof String){
 		path = options.workerpath;
@@ -66,8 +65,9 @@ var metaworker = function(options){
 		worker.terminate();
 	};
 
-	var num_workers = 8;
-	var slice_size = Math.min((num_workers * num_workers), options.work.length);
+	var maxMappers = 3;
+	
+	var slice_size = Math.min((maxMappers * maxMappers), options.work.length);
 	console.log("slice_size",slice_size);
 
 	// don't parallelize if the work is too small
@@ -84,9 +84,9 @@ var metaworker = function(options){
 		var numTotalChunks = chunks.length;
 		var numReturnedChunks = 0;
 		var reducedChunks = [];
-		
+
 		var doMoreWork = function(){
-			for(var i=0;i<num_workers;i++){
+			for(var i=0;i<maxMappers;i++){
 				var nextWorkChunk = (chunks.splice(0,1))[0];
 				(function(chunk){
 					var chunkIndex = Math.round(Math.random()*10000000);
@@ -100,11 +100,21 @@ var metaworker = function(options){
 
 							numReturnedChunks++;
 
-							// combine intermediate results with existing results
+							//
+							// Allow user code to peek at intermediate results and render any progress
+							// indicators or graphics (i.e. for iterative renderers)
+							//
+							if(typeof(options.onIntermediateResults)=='function'){
+								options.onIntermediateResults([result]);
+							}
+
+							//
+							// Combine intermediate results with existing results
+							//
 							console.log("Sending new results to be reduced with existing intermediate results");
 							reducedChunks = options.reducer(reducedChunks,[result]);
 
-							activeSubworkers--;
+							activeMappers--;
 
 							// Check if we're finished the entire work set. if yes, stop
 							// spawning more workers and call the user's callback function.
@@ -112,17 +122,17 @@ var metaworker = function(options){
 								options.callback(reducedChunks);
 							} else {
 								// if we're not done yet and we've run out of workers, spawn more workers
-								if(activeSubworkers==0){
+								if(activeMappers==0){
 									doMoreWork();
 								}
 							}
 
-							console.log("active workers:",activeSubworkers);
+							console.log("active workers:",activeMappers);
 						}
 					});
 				})(nextWorkChunk);
 
-				activeSubworkers++;
+				activeMappers++;
 			}
 		};
 		

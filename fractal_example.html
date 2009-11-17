@@ -43,8 +43,8 @@
 					} else {
 						// pixels.push([Math.round(n * 16 % 255), Math.round(n * 16 % 255), Math.round(n * 16 % 255)]);
 						var r = Math.floor(n * 1600 % 255);
-						var g = Math.floor(n * 3200 % 255);
-						var b = Math.floor(n * 6400 % 255);
+						var g = Math.floor(n * 800 % 255);
+						var b = Math.floor(n * 200 % 255);
 						pixels.push([r,g,b]);
 					}
 					x += dx;
@@ -57,35 +57,40 @@
 			return results;
 		};
 		
-		var drawSubresult = function(rows){
+		var drawRows = function(rows){
 			var canvas = document.getElementById('canv');
 			if (canvas.getContext){
 				var ctx = canvas.getContext('2d');
 				for(var i=0;i<rows.length;i++){
+					var runLength = 0;
 					var row = rows[i];
 					var y = row.rowIndex;
 					var pixels = row.pixels;
-					for(var x=0;x<pixels.length;x++){
+					var plen = pixels.length;
+					for(var x=0;x<plen;x++){
 						ctx.fillStyle = 'rgb(' + pixels[x][0] + ',' + pixels[x][1] + ',' + pixels[x][2] + ')';
-						ctx.fillRect (x, y, 1, 1);
+						while((x+runLength+1)<plen && 
+							(
+								pixels[x+runLength+1][0] == pixels[x][0] &&
+								pixels[x+runLength+1][1] == pixels[x][1] &&
+								pixels[x+runLength+1][2] == pixels[x][2]
+							)
+						){
+							runLength++;
+						}
+						ctx.fillRect (x, y, 1 + runLength, 1);
+						// skip ahead
+						if(runLength>0){
+							x = x + runLength;
+							runLength = 0;
+							if(x>=plen){
+								return;
+							}
+						}
 					}
 				}
 			}
 		};
-		
-		var drawResults = function(rows){
-			var canvas = document.getElementById('canv');
-			if (canvas.getContext){
-				var ctx = canvas.getContext('2d');
-				for(var y=0;y<rows.length;y++){
-					for(var x=0;x<rows[y].length;x++){
-						ctx.fillStyle = 'rgb(' + rows[y][x][0] + ',' + rows[y][x][1] + ',' + rows[y][x][2] + ')';
-						ctx.fillRect (x, y, 1, 1);
-					}
-				}
-			}
-		};
-
 
 
 		var rows = [];
@@ -97,7 +102,7 @@
 		var xmax = width;
 		var ymax = height;
 		var wh = 4;
-		var maxiterations = 50;
+		var maxiterations = 30;
 		var xmax = xmin + wh;
 		var ymax = ymin + wh;
 		var dx = (xmax - ymin) / width;
@@ -122,18 +127,26 @@
 		
 		var counter = 0;
 		setInterval(function(){
-			document.getElementById("counter").innerHTML = counter;
+			document.getElementById("counter").innerHTML = (new Date()).toString();
 			counter++;
-		},250);
+		},1000);
 		
 		var received_work_count = 0;
 		for(var i=0;i<work.length;i++){
 			metaworker({
 				mapper: mandelRow,
+				onIntermediateResults: function(intermediate_results){
+					var rd = new Date();
+					var rstartTime = rd.getTime();
+					for(var i=0;i<intermediate_results.length;i++){
+						drawRows(intermediate_results[i]);
+					}
+					var rd2 = new Date();
+					var rendTime = rd2.getTime();
+					console.log("Renderer took ",((rendTime-rstartTime)),"ms to render ",intermediate_results.length," rows");
+				},
 				reducer: function(existing_results, intermediate_results){
 					console.log("reducer input is of length",intermediate_results.length);
-					var d = new Date();
-					var startTime = d.getTime();
 					
 					//
 					// reducer receives work results from workers and just concatenates them
@@ -148,15 +161,8 @@
 					// as if the entire process had been done by a single thread
 					//
 
-					var rd = new Date();
-					var rstartTime = rd.getTime();
-					for(var i=0;i<intermediate_results.length;i++){
-						drawSubresult(intermediate_results[i]);
-					}
-					var rd2 = new Date();
-					var rendTime = rd2.getTime();
-					console.log("Renderer took ",((rendTime-rstartTime)),"ms to render ",intermediate_results.length," rows");
-
+					var d = new Date();
+					var startTime = d.getTime();
 					for(var i=0;i<intermediate_results.length;i++){
 						if(intermediate_results[i].length > 0){
 							for(var ir=0;ir<intermediate_results[i].length;ir++){
@@ -166,8 +172,7 @@
 					}
 					var d2 = new Date();
 					var endTime = d2.getTime();
-					// console.log("Reducer took ",((endTime-startTime)),"ms");
-					console.log("reducer out is of length",existing_results.length);
+					console.log("non-canvas reduction phase took ",(endTime-startTime),"ms to run");
 
 					return existing_results;
 				},
