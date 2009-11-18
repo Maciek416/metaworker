@@ -11,6 +11,9 @@
 	<script type="text/javascript" src="metaworker_lib.js"></script>
 	<script type="text/javascript">
 
+		//
+		// This is a map function
+		//
 		var mandelRow = function(work) {
 			var results = [];
 			for(var w=0;w<work.length;w++){
@@ -56,7 +59,12 @@
 			}
 			return results;
 		};
-		
+
+
+
+		//
+		// This function takes an array of rows of RGB data and renders them to the canvas
+		//
 		var drawRows = function(rows){
 			var canvas = document.getElementById('canv');
 			if (canvas.getContext){
@@ -102,7 +110,7 @@
 		var xmax = width;
 		var ymax = height;
 		var wh = 4;
-		var maxiterations = 30;
+		var maxiterations = 25;
 		var xmax = xmin + wh;
 		var ymax = ymin + wh;
 		var dx = (xmax - ymin) / width;
@@ -131,60 +139,47 @@
 			counter++;
 		},1000);
 		
-		var received_work_count = 0;
-		for(var i=0;i<work.length;i++){
-			metaworker({
-				mapper: mandelRow,
-				onIntermediateResults: function(intermediate_results){
-					var rd = new Date();
-					var rstartTime = rd.getTime();
-					for(var i=0;i<intermediate_results.length;i++){
-						drawRows(intermediate_results[i]);
-					}
-					var rd2 = new Date();
-					var rendTime = rd2.getTime();
-					console.log("Renderer took ",((rendTime-rstartTime)),"ms to render ",intermediate_results.length," rows");
-				},
-				reducer: function(existing_results, intermediate_results){
-					console.log("reducer input is of length",intermediate_results.length);
-					
-					//
-					// reducer receives work results from workers and just concatenates them
-					// intermediate results looks like this:
-					//
-					// [[rowresult,rowresult,rowresult], [rowresult,rowresult,rowresult], ..]
-					//
-					// we want to output:
-					//
-					// [rowresult,rowresult,rowresult, rowresult,rowresult,rowresult, ..]
-					//
-					// as if the entire process had been done by a single thread
-					//
+		var w = metaworker({
+			mapper: mandelRow,
+			partitionSize:24,
+			onIntermediateResults: function(intermediate_results){
+				for(var i=0;i<intermediate_results.length;i++){
+					drawRows(intermediate_results[i]);
+				}
+			},
+			reducer: function(existing_results, intermediate_results){
+				//
+				// reducer receives work results from workers and just concatenates them
+				// intermediate results looks like this:
+				//
+				// [[rowresult,rowresult,rowresult], [rowresult,rowresult,rowresult], ..]
+				//
+				// we want to output:
+				//
+				// [rowresult,rowresult,rowresult, rowresult,rowresult,rowresult, ..]
+				//
+				// as if the entire process had been done by a single thread
+				//
 
-					var d = new Date();
-					var startTime = d.getTime();
-					for(var i=0;i<intermediate_results.length;i++){
-						if(intermediate_results[i].length > 0){
-							for(var ir=0;ir<intermediate_results[i].length;ir++){
-								existing_results.push(intermediate_results[i][ir]);
-							}
+				for(var i=0;i<intermediate_results.length;i++){
+					if(intermediate_results[i].length > 0){
+						for(var ir=0;ir<intermediate_results[i].length;ir++){
+							existing_results.push(intermediate_results[i][ir]);
 						}
 					}
-					var d2 = new Date();
-					var endTime = d2.getTime();
-					console.log("non-canvas reduction phase took ",(endTime-startTime),"ms to run");
-
-					return existing_results;
-				},
-				parallel: true,
-				work: work,
-				callback:function(result){
-					// result is a mandelbrot
-					console.log("Callback received resulting mandelbrot rendering ",result.length," rows in length.");
 				}
-			});
-		}		
 
+				return existing_results;
+			},
+			parallel: true,
+			work: work,
+			callback:function(result){
+				// The result argument is an array of pixels representing the mandelbrot,
+				// but we don't have to use this array here 
+			}
+		});
+
+		w.start();
 
 	</script>
 </html>

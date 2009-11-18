@@ -13,12 +13,10 @@
 
 			var mapper = function(items){
 				var id = Math.round(Math.random() * 10000);
-				console.log(id+"#mapper got items:",items);
 				var result = 0;
 				for(var i=0;i<items.length;i++){
 					result = result + items[i];
 				}
-				console.log(id+"#mapper returning:",result);
 				return result;
 			};
 
@@ -38,22 +36,25 @@
 			};
 
 			var work = [];
-			for(var i=0;i<1000;i++){
+			for(var i=0;i<10000;i++){
 				work.push(i);
 			}
 
 			// as it happens, mapping and reducing is the same operation here
-			metaworker({
+			var w = metaworker({
 				mapper: mapper,
 				reducer: reducer,
 				work: work,
 				parallel:true,
+				partitionSize:1000,
 				callback: function(result){
 					document.getElementById("results").innerHTML = "";
 					document.getElementById("results").appendChild(document.createElement("br"));
 					document.getElementById("results").appendChild(document.createTextNode("Got back result:" + result));
 				}
 			});
+
+			w.start();
 
 
 		</script>  

@@ -21,11 +21,17 @@ var console = {
 		postMessage({ type:'dir', payload:args });
 	}
 };
-onmessage = function(event) {  
-	var payload = event.data;
-	payload.func = eval("(" + payload.func + ")");
-	postMessage({
-		type: 'data',
-		payload: payload.func.apply(this,payload.args)
-	});
+
+var payload;
+
+onmessage = function(event) {
+	if(event.data.type=='payload'){
+		payload = event.data;
+	} else if (event.data.type=='start'){
+		var func = eval("(" + payload.func + ")");
+		postMessage({
+			type: 'data',
+			payload: func.apply(this,payload.args)
+		});
+	}
 };
