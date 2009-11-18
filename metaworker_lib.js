@@ -26,18 +26,15 @@
 //
 // TODO:
 //
-//
-//
-//  * wait until after the creation loop to actually -start- the workers. oops ?
-//
-//
-//
 //  * we need an example that does word counts
 //  * allow user to control number of simultaneous threads
 //  * allow user to force reduction to happen in a worker
 //  * rewrite fractal example to use above option
 //  * make getMoreWorkers not be recursive
 //  * don't wait until number of workers is 0 before spawning more workers, keep the worker count steady
+//  * test Safari support and implement JSON conversions if necessary
+//  * validate paths
+//  * validate work input types as array objects when in parallel mode
 //
 
 var metaworker = function(options){
