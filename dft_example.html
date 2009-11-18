@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>  
+	<head>
+		<title>metaworker examples - DFT</title>
+	</head>
+	<script type="text/javascript" src="metaworker_lib.js"></script>
+	<body>
+
+		<h1>metaworker examples - Discrete Fourier Transform (DFT)</h1>
+		<pre id="results">Please wait.. workers are calculating</pre>
+
+		<script language="javascript">
+      var bufferSize = 4096; // N - the number of samples sent to the DFT 
+      var partition = Math.round(bufferSize / 10);
+      var sampleRate = 44100;
+      var frequency = 1720; // frequency of the signal waveform in Hz
+      var bandwidth = (2 / bufferSize) * (sampleRate  / 2);
+
+      // the mapper is fed an array of items, partition size in length and runs operations on the data.
+			var mapper = function(items){
+        var bufferSize = 4096; // N - the number of samples sent to the DFT 
+        var sampleRate = 44100;
+        var frequency = 1720; // frequency of the signal waveform in Hz
+        var bandwidth = (2 / bufferSize) * (sampleRate  / 2);
+
+        // generate the signal waveform
+        var signal = [];
+        for ( var i = 0; i < bufferSize; i++ ) {
+          var step = i * (frequency / sampleRate) % 1;  
+          signal.push(Math.sin(step * 2 * Math.PI)); // sine wave
+        }
+
+        var real = [];
+        var imag = [];
+        var result = [];
+        for ( var k = items[0]; k < items[0] + items.length; k++ ) {
+          real[k] = 0;
+          imag[k] = 0;
+          for ( var n = 0; n < bufferSize; n++ ) {
+            real[k] += signal[n] * Math.cos(-2 * Math.PI * k * n / bufferSize);
+            imag[k] += signal[n] * Math.sin(-2 * Math.PI * k * n / bufferSize);
+          }
+          result.push(Math.sqrt(Math.pow(real[k],2) + Math.pow(imag[k],2)) / bufferSize); 
+        }
+
+        return [items[0], result];
+			};
+
+      // the reducer, reduces or combines the partioned results 
+			var reducer = function(intermediate_aggregate, new_results){
+				var result;
+				if ( intermediate_aggregate.length > 0 ) {
+					// we need to add to an intermediate sum from another reducer
+          result = intermediate_aggregate;
+				} else {
+					// bootstrap reduction
+					result = new Array(bufferSize);
+				}
+        var bufferStart = new_results[0][0];
+        for ( var i = bufferStart; i < bufferStart + partition; i++ ) { 
+          result[i] = new_results[0][1][i - bufferStart];
+        }
+				return result;
+			};
+
+			var work = [];
+			for ( var i = 0; i < bufferSize; i++ ) {
+				work.push(i);
+			}
+
+			var w = metaworker({
+				mapper: mapper,
+				reducer: reducer,
+				work: work,
+				parallel: true,
+				partitionSize: partition,
+				callback: function(result){
+					document.getElementById("results").innerHTML = "";
+					document.getElementById("results").appendChild(document.createElement("br"));
+          var max = 0;
+          var maxBin = 0;
+          for ( var i = 0; i < result.length; i++ ) {
+            if (result[i] > max) {
+              max = result[i];
+              maxBin = i;
+            }
+          }
+					document.getElementById("results").appendChild(document.createTextNode("Highest Peak Frequency: " + maxBin * bandwidth + "Hz (+/- " + bandwidth/2 + "Hz) with magnitude of " + max));
+				}
+			});
+
+			w.start();
+		</script>  
+	</body>  
+</html>  
