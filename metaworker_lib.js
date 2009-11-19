@@ -124,6 +124,10 @@ var metaworker = function(options){
 		if(typeof(partitionSize)!='number' || partitionSize<=0){
 			throw "Invalid partition size of ["+partitionSize+"] specified";
 		}
+		// ensure partition size isn't a floating point value
+		if(parseInt(partitionSize)!=parseFloat(partitionSize)){
+			throw "Invalid partition size of ["+partitionSize+"] specified";
+		}
 
 		// Partition the work into partitionSize'd chunks. The last one might
 		// be equal to or smaller than partitionSize
