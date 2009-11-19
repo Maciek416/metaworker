@@ -30,7 +30,6 @@
 //  * allow user to control number of simultaneous threads
 //  * allow user to force reduction to happen in a worker
 //  * rewrite fractal example to use above option
-//  * make getMoreWorkers not be recursive
 //  * don't wait until number of workers is 0 before spawning more workers, keep the worker count steady
 //  * test Safari support and implement JSON conversions if necessary
 //  * validate paths
