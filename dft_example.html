@@ -1,82 +1,92 @@
 <!DOCTYPE html>
 <html>  
-	<head>
-		<title>metaworker examples - DFT</title>
-	</head>
-	<script type="text/javascript" src="metaworker_lib.js"></script>
-	<body>
+  <head>
+    <title>metaworker examples - DFT</title>
+  </head>
+  <script type="text/javascript" src="metaworker_lib.js"></script>
+  <body>
 
-		<h1>metaworker examples - Discrete Fourier Transform (DFT)</h1>
-		<pre id="results">Please wait.. workers are calculating</pre>
+    <h1>metaworker examples - Discrete Fourier Transform (DFT)</h1>
+    <pre id="results">Please wait.. workers are calculating</pre>
 
-		<script language="javascript">
+    <script language="javascript">
       var bufferSize = 4096; // N - the number of samples sent to the DFT 
-      var partition = Math.round(bufferSize / 10);
+      var partitionSize = Math.round(bufferSize / 8); // How many work items each worker handles at a time
       var sampleRate = 44100;
+      var bandwidth = (2 / bufferSize) * (sampleRate  / 2); // bandwidth of each DFT bin
       var frequency = 1720; // frequency of the signal waveform in Hz
-      var bandwidth = (2 / bufferSize) * (sampleRate  / 2);
 
-      // the mapper is fed an array of items, partition size in length and runs operations on the data.
-			var mapper = function(items){
-        var bufferSize = 4096; // N - the number of samples sent to the DFT 
-        var sampleRate = 44100;
-        var frequency = 1720; // frequency of the signal waveform in Hz
-        var bandwidth = (2 / bufferSize) * (sampleRate  / 2);
-
-        // generate the signal waveform
+      var mapper = function(items){
+        var range = items[0];
         var signal = [];
-        for ( var i = 0; i < bufferSize; i++ ) {
-          var step = i * (frequency / sampleRate) % 1;  
-          signal.push(Math.sin(step * 2 * Math.PI)); // sine wave
-        }
-
         var real = [];
         var imag = [];
         var result = [];
-        for ( var k = items[0]; k < items[0] + items.length; k++ ) {
+
+        // generate the signal waveform
+        for ( var i = 0; i < range.bufferSize; i++ ) {
+          var step = i * (range.frequency / range.sampleRate) % 1;  
+          signal.push(Math.sin(step * 2 * Math.PI)); // sine wave
+        }
+
+        for ( var k = range.start; k < range.end; k++ ) {
           real[k] = 0;
           imag[k] = 0;
-          for ( var n = 0; n < bufferSize; n++ ) {
-            real[k] += signal[n] * Math.cos(-2 * Math.PI * k * n / bufferSize);
-            imag[k] += signal[n] * Math.sin(-2 * Math.PI * k * n / bufferSize);
+          for ( var n = 0; n < range.bufferSize; n++ ) {
+            real[k] += signal[n] * Math.cos(-2 * Math.PI * k * n / range.bufferSize);
+            imag[k] += signal[n] * Math.sin(-2 * Math.PI * k * n / range.bufferSize);
           }
-          result.push(Math.sqrt(Math.pow(real[k],2) + Math.pow(imag[k],2)) / bufferSize); 
+          result.push(Math.sqrt(Math.pow(real[k], 2) + Math.pow(imag[k], 2)) / range.bufferSize); // calculate magnitude 
         }
 
-        return [items[0], result];
-			};
+        return [range.start, result];
+      };
 
       // the reducer, reduces or combines the partioned results 
-			var reducer = function(intermediate_aggregate, new_results){
-				var result;
-				if ( intermediate_aggregate.length > 0 ) {
-					// we need to add to an intermediate sum from another reducer
+      var reducer = function(intermediate_aggregate, new_results){
+        var result;
+
+        if ( intermediate_aggregate.length > 0 ) {
+          // we need to add to an intermediate sum from another reducer
           result = intermediate_aggregate;
-				} else {
-					// bootstrap reduction
-					result = new Array(bufferSize);
-				}
-        var bufferStart = new_results[0][0];
-        for ( var i = bufferStart; i < bufferStart + partition; i++ ) { 
-          result[i] = new_results[0][1][i - bufferStart];
+        } else {
+          // bootstrap reduction
+          result = new Array(bufferSize / 2);
         }
-				return result;
-			};
 
-			var work = [];
-			for ( var i = 0; i < bufferSize; i++ ) {
-				work.push(i);
-			}
+        var bufferStart = new_results[0][0];
 
-			var w = metaworker({
-				mapper: mapper,
-				reducer: reducer,
-				work: work,
-				parallel: true,
-				partitionSize: partition,
-				callback: function(result){
-					document.getElementById("results").innerHTML = "";
-					document.getElementById("results").appendChild(document.createElement("br"));
+        // populate the spectrum array
+        for ( var i = bufferStart; i < bufferStart + partitionSize; i++ ) { 
+          if ( i < bufferSize / 2 ) {
+            result[i] = new_results[0][1][i - bufferStart];
+          }
+        }
+        
+        return result;
+      };
+
+      // work routine sets up bin ranges to compute 
+      var work = [];
+      for ( var i = 0; i < bufferSize / 2; i += partitionSize ) {
+        work.push({
+          bufferSize: bufferSize,
+          sampleRate: sampleRate,
+          frequency: frequency,
+          start: i,
+          end: i + partitionSize
+        });
+      }
+
+      var w = metaworker({
+        mapper: mapper,
+        reducer: reducer,
+        work: work,
+        parallel: true,
+        partitionSize: 1, // partitioning is handled in the work routine, keep this at 1
+        callback: function(result){
+          document.getElementById("results").innerHTML = "";
+          document.getElementById("results").appendChild(document.createElement("br"));
           var max = 0;
           var maxBin = 0;
           for ( var i = 0; i < result.length; i++ ) {
@@ -85,11 +95,13 @@
               maxBin = i;
             }
           }
-					document.getElementById("results").appendChild(document.createTextNode("Highest Peak Frequency: " + maxBin * bandwidth + "Hz (+/- " + bandwidth/2 + "Hz) with magnitude of " + max));
-				}
-			});
+          document.getElementById("results").appendChild(document.createTextNode("Generated signal input frequency: " + frequency + "Hz"));
+          document.getElementById("results").appendChild(document.createElement("br"));
+          document.getElementById("results").appendChild(document.createTextNode("DFT found frequency: " + maxBin * bandwidth + "Hz (+/- " + bandwidth/2 + "Hz) with magnitude of " + max + " specSize: " + result.length));
+        }
+      });
 
-			w.start();
-		</script>  
-	</body>  
+      w.start(); 
+    </script>  
+  </body>  
 </html>  
