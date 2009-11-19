@@ -30,7 +30,6 @@
 //  * allow user to control number of simultaneous threads
 //  * allow user to force reduction to happen in a worker
 //  * rewrite fractal example to use above option
-//  * make getMoreWorkers not be recursive
 //  * don't wait until number of workers is 0 before spawning more workers, keep the worker count steady
 //  * test Safari support and implement JSON conversions if necessary
 //  * validate paths
@@ -80,6 +79,9 @@ var metaworker = function(options){
 			console.log("Starting up ",workers.length," workers.");
 		}
 		for(var i=0;i<workers.length;i++){
+			if(debuggingEnabled==true) {
+				console.log("Starting worker "+i);
+			}
 			workers[i].start();
 		}
 	};
@@ -93,9 +95,8 @@ var metaworker = function(options){
 			options.callback(callbackData.payload);
 		} else if(({'log':true,'debug':true,'dir':true}).hasOwnProperty(callbackData.type)){
 			if(debuggingEnabled==true) {
-				if(window.console.log && window.console.debug && window.console.dir){
-					console[callbackData.type].apply(this,callbackData.payload);
-				}
+				// TODO: detect firebug reliably, checking window.console seems to be very weird
+				console[callbackData.type].apply(this,callbackData.payload);
 			}
 		}
 		worker.terminate();
@@ -122,6 +123,10 @@ var metaworker = function(options){
 
 		// validate partition size
 		if(typeof(partitionSize)!='number' || partitionSize<=0){
+			throw "Invalid partition size of ["+partitionSize+"] specified";
+		}
+		// ensure partition size isn't a floating point value
+		if(parseInt(partitionSize)!=parseFloat(partitionSize)){
 			throw "Invalid partition size of ["+partitionSize+"] specified";
 		}
 
@@ -169,6 +174,7 @@ var metaworker = function(options){
 
 						workerPool.push(
 							metaworker({
+								debug:debuggingEnabled,
 								mapper: options.mapper,
 								work: chunk,
 								callback: function(result){
@@ -257,6 +263,9 @@ var metaworker = function(options){
 	return {
 		start:function(){
 			if(options.parallel){
+				if(debuggingEnabled==true) {
+					console.log("Starting workers..");
+				}
 				startWorkerPool(workerPool);
 			} else {
 				worker.postMessage({
