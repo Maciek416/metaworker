@@ -79,6 +79,9 @@ var metaworker = function(options){
 			console.log("Starting up ",workers.length," workers.");
 		}
 		for(var i=0;i<workers.length;i++){
+			if(debuggingEnabled==true) {
+				console.log("Starting worker "+i);
+			}
 			workers[i].start();
 		}
 	};
@@ -92,9 +95,8 @@ var metaworker = function(options){
 			options.callback(callbackData.payload);
 		} else if(({'log':true,'debug':true,'dir':true}).hasOwnProperty(callbackData.type)){
 			if(debuggingEnabled==true) {
-				if(window.console.log && window.console.debug && window.console.dir){
-					console[callbackData.type].apply(this,callbackData.payload);
-				}
+				// TODO: detect firebug reliably, checking window.console seems to be very weird
+				console[callbackData.type].apply(this,callbackData.payload);
 			}
 		}
 		worker.terminate();
@@ -172,6 +174,7 @@ var metaworker = function(options){
 
 						workerPool.push(
 							metaworker({
+								debug:debuggingEnabled,
 								mapper: options.mapper,
 								work: chunk,
 								callback: function(result){
@@ -260,6 +263,9 @@ var metaworker = function(options){
 	return {
 		start:function(){
 			if(options.parallel){
+				if(debuggingEnabled==true) {
+					console.log("Starting workers..");
+				}
 				startWorkerPool(workerPool);
 			} else {
 				worker.postMessage({
