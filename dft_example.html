@@ -8,13 +8,14 @@
 
     <h1>metaworker examples - Discrete Fourier Transform (DFT)</h1>
     <pre id="results">Please wait.. workers are calculating</pre>
+    <canvas id="canv" width="820" style="border: 7px solid black;" height="320"></canvas>
 
     <script language="javascript">
-      var bufferSize = 4096; // N - the number of samples sent to the DFT 
-      var partitionSize = Math.round(bufferSize / 8); // How many work items each worker handles at a time
+      var bufferSize = 2048; // N - the number of samples sent to the DFT 
+      var partitionSize = Math.round(bufferSize / 10); // How many work items each worker handles at a time
       var sampleRate = 44100;
       var bandwidth = (2 / bufferSize) * (sampleRate  / 2); // bandwidth of each DFT bin
-      var frequency = 1720; // frequency of the signal waveform in Hz
+      var frequency = 880; // frequency of the signal waveform in Hz
 
       var mapper = function(items){
         var range = items[0];
@@ -26,7 +27,8 @@
         // generate the signal waveform
         for ( var i = 0; i < range.bufferSize; i++ ) {
           var step = i * (range.frequency / range.sampleRate) % 1;  
-          signal.push(Math.sin(step * 2 * Math.PI)); // sine wave
+          //signal.push(Math.sin(step * 2 * Math.PI)); // sine wave
+          signal.push((step < 0.5) ? 1 : -1); // square wave
         }
 
         for ( var k = range.start; k < range.end; k++ ) {
@@ -36,7 +38,7 @@
             real[k] += signal[n] * Math.cos(-2 * Math.PI * k * n / range.bufferSize);
             imag[k] += signal[n] * Math.sin(-2 * Math.PI * k * n / range.bufferSize);
           }
-          result.push(Math.sqrt(Math.pow(real[k], 2) + Math.pow(imag[k], 2)) / range.bufferSize); // calculate magnitude 
+          result.push(2 * Math.sqrt(Math.pow(real[k], 2) + Math.pow(imag[k], 2)) / range.bufferSize); // calculate magnitude 
         }
 
         return [range.start, result];
@@ -60,6 +62,20 @@
         for ( var i = bufferStart; i < bufferStart + partitionSize; i++ ) { 
           if ( i < bufferSize / 2 ) {
             result[i] = new_results[0][1][i - bufferStart];
+
+            // draw results to canvas
+            if( canvas.getContext ) {
+              var ctx = canvas.getContext("2d");
+
+              if ( i > bufferStart ) {
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "blue"
+                ctx.moveTo(i, 310 - Math.ceil(result[i] * 240));
+                ctx.lineTo(i-1, 310 - Math.ceil(result[i-1] * 240));
+                ctx.stroke();
+              }
+            }
           }
         }
         
@@ -78,6 +94,8 @@
         });
       }
 
+      var canvas = document.getElementById("canv");
+
       var w = metaworker({
         mapper: mapper,
         reducer: reducer,
@@ -95,7 +113,7 @@
               maxBin = i;
             }
           }
-          document.getElementById("results").appendChild(document.createTextNode("Generated signal input frequency: " + frequency + "Hz"));
+          document.getElementById("results").appendChild(document.createTextNode("Generated signal input frequency: " + frequency + "Hz square wave"));
           document.getElementById("results").appendChild(document.createElement("br"));
           document.getElementById("results").appendChild(document.createTextNode("DFT found frequency: " + maxBin * bandwidth + "Hz (+/- " + bandwidth/2 + "Hz) with magnitude of " + max + " specSize: " + result.length));
         }
