@@ -22,7 +22,6 @@
 				var x = config.x;
 				var y = config.y;
 				var width = config.width;
-				var maxiterations = config.maxiterations;
 				var dx = config.dx;
 
 				var pixels = [];
@@ -173,6 +172,17 @@
 			},
 			parallel: true,
 			work: work,
+			// Globals gives you the option of having global variables accessible from your mapper. This is 
+			// merely provided so that you don't have to cram all the necessary information into your work 
+			// units. You'll note in the example above that mandelRow doesn't define or receive maxiterations
+			// in any shape or form. Instead, it's globally available via globals.
+			//
+			// Note: since looking up globals still involves crawling up the scope and fetching those references,
+			// in certain cases for performance reasons you'll still want to create local variables to contain
+			// those values within your mapper
+			globals: {
+				maxiterations: maxiterations
+			},
 			callback:function(result){
 				// The result argument is an array of pixels representing the mandelbrot,
 				// but we don't have to use this array here 
