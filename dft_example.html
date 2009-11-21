@@ -16,29 +16,23 @@
       var sampleRate = 44100;
       var bandwidth = (2 / bufferSize) * (sampleRate  / 2); // bandwidth of each DFT bin
       var frequency = 880; // frequency of the signal waveform in Hz
+      var signal = [];
+      var work = [];
 
       var mapper = function(items){
         var range = items[0];
-        var signal = [];
         var real = [];
         var imag = [];
         var result = [];
 
-        // generate the signal waveform
-        for ( var i = 0; i < range.bufferSize; i++ ) {
-          var step = i * (range.frequency / range.sampleRate) % 1;  
-          //signal.push(Math.sin(step * 2 * Math.PI)); // sine wave
-          signal.push((step < 0.5) ? 1 : -1); // square wave
-        }
-
         for ( var k = range.start; k < range.end; k++ ) {
           real[k] = 0;
           imag[k] = 0;
-          for ( var n = 0; n < range.bufferSize; n++ ) {
-            real[k] += signal[n] * Math.cos(-2 * Math.PI * k * n / range.bufferSize);
-            imag[k] += signal[n] * Math.sin(-2 * Math.PI * k * n / range.bufferSize);
+          for ( var n = 0; n < bufferSize; n++ ) {
+            real[k] += signal[n] * Math.cos(-2 * Math.PI * k * n / bufferSize);
+            imag[k] += signal[n] * Math.sin(-2 * Math.PI * k * n / bufferSize);
           }
-          result.push(2 * Math.sqrt(Math.pow(real[k], 2) + Math.pow(imag[k], 2)) / range.bufferSize); // calculate magnitude 
+          result.push(2 * Math.sqrt(Math.pow(real[k], 2) + Math.pow(imag[k], 2)) / bufferSize); // calculate magnitude 
         }
 
         return [range.start, result];
@@ -83,15 +77,18 @@
       };
 
       // work routine sets up bin ranges to compute 
-      var work = [];
       for ( var i = 0; i < bufferSize / 2; i += partitionSize ) {
         work.push({
-          bufferSize: bufferSize,
-          sampleRate: sampleRate,
-          frequency: frequency,
           start: i,
           end: i + partitionSize
         });
+      }
+
+      // generate the signal waveform
+      for ( var i = 0; i < bufferSize; i++ ) {
+        var step = i * (frequency / sampleRate) % 1;  
+        //signal.push(Math.sin(step * 2 * Math.PI)); // sine wave
+        signal.push((step < 0.5) ? 1 : -1); // square wave
       }
 
       var canvas = document.getElementById("canv");
@@ -102,6 +99,10 @@
         work: work,
         parallel: true,
         partitionSize: 1, // partitioning is handled in the work routine, keep this at 1
+        globals: { 
+          bufferSize: bufferSize,
+          signal: signal 
+        },
         callback: function(result){
           document.getElementById("results").innerHTML = "";
           document.getElementById("results").appendChild(document.createElement("br"));
