@@ -177,6 +177,7 @@ var metaworker = function(options){
 								debug:debuggingEnabled,
 								mapper: options.mapper,
 								work: chunk,
+								globals: options.globals,
 								callback: function(result){
 									if(debuggingEnabled==true) {
 										console.log("Mapper #"+chunkIndex+" has returned data");
@@ -256,7 +257,8 @@ var metaworker = function(options){
 		worker.postMessage({
 			type:'payload',
 			func:(f.toSource ? f.toSource( ): f.toString()),
-			args:[options.work]
+			args:[options.work],
+			globals:options.globals
 		});
 	}
 	

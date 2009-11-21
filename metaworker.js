@@ -65,6 +65,19 @@ onmessage = function(event) {
 	if(event.data.type=='payload'){
 		payload = event.data;
 	} else if (event.data.type=='start'){
+		//
+		// Copy convenience global variables to "global" scope on self
+		//
+		if(payload.globals!=null){
+			for(var key in payload.globals){
+				if(payload.globals.hasOwnProperty(key)){
+					self[key] = payload.globals[key];
+				}
+			}
+		}
+		//
+		// Start processing and post results to dispatcher
+		//
 		var func = eval("(" + payload.func + ")");
 		postMessage({
 			type: 'data',
