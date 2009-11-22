@@ -36,13 +36,47 @@
 //  * validate work input types as array objects when in parallel mode
 //
 
+
+var AJAXWorker = function(url){
+	var payload = null;
+	var self = {
+		postMessage:function(msg){
+			if(msg.type=='payload'){
+				payload = msg;
+			} else if (msg.type=="start"){
+				var xhr = new XMLHttpRequest();
+				xhr.onreadystatechange = function() {
+					if (xhr.readyState === 4 && xhr.status === 200){
+						self.onmessage({
+							data:{
+								payload:JSON.parse(xhr.responseText),
+								type:'data'
+							}
+						});
+					}
+				};
+				xhr.open('GET', url+"metaworker.json?rnd="+Math.random()+"&payload="+encodeURIComponent(JSON.stringify(payload)) );
+				xhr.send("");
+				return;
+			}
+		},
+		terminate:function(){
+			// do nothing. AJAX workers don't need termination
+		}
+	};
+	return self;
+};
+
+
 var metaworker = function(options){
 
+	var workerType = (options.workerType=="ajax"||options.workerType=="local")?options.workerType:"local"; // ajax | local
 	var debuggingEnabled = options.debug;
 	var path = "";
 	var activeMappers = 0;
-	var maxMappers = 2;
+	var maxMappers = (typeof(options.maxWorkers)=='number' && options.maxWorkers > 0)?options.maxWorkers:2;
 	var partitionSize = options.partitionSize;
+
 
 	// this allows us to place metaworker.js in some arbitrary path
 	// note that the path we pass in must end in '/' since metaworker
@@ -86,7 +120,17 @@ var metaworker = function(options){
 		}
 	};
 
-	var worker = new Worker(path + "metaworker.js");
+	if(workerType=="ajax"){
+		if(debuggingEnabled==true) {
+			console.log("Worker starting in AJAX mode.");
+		}
+		var worker = AJAXWorker(options.serverURL);
+	} else {
+		if(debuggingEnabled==true) {
+			console.log("Worker starting in local mode.");
+		}
+		var worker = new Worker(path + "metaworker.js");
+	}
 
 	// receive a message from our worker. Messages can either be logging or callback
 	worker.onmessage = function(event) {
@@ -178,6 +222,8 @@ var metaworker = function(options){
 								mapper: options.mapper,
 								work: chunk,
 								globals: options.globals,
+								serverURL:options.serverURL,
+								workerType:workerType,
 								callback: function(result){
 									if(debuggingEnabled==true) {
 										console.log("Mapper #"+chunkIndex+" has returned data");
