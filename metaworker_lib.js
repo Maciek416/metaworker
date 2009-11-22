@@ -37,39 +37,9 @@
 //
 
 
-var AJAXWorker = function(url){
-	var payload = null;
-	var self = {
-		postMessage:function(msg){
-			if(msg.type=='payload'){
-				payload = msg;
-			} else if (msg.type=="start"){
-				var xhr = new XMLHttpRequest();
-				xhr.onreadystatechange = function() {
-					if (xhr.readyState === 4 && xhr.status === 200){
-						self.onmessage({
-							data:{
-								payload:JSON.parse(xhr.responseText),
-								type:'data'
-							}
-						});
-					}
-				};
-				xhr.open('GET', url+"metaworker.json?rnd="+Math.random()+"&payload="+encodeURIComponent(JSON.stringify(payload)) );
-				xhr.send("");
-				return;
-			}
-		},
-		terminate:function(){
-			// do nothing. AJAX workers don't need termination
-		}
-	};
-	return self;
-};
-
-
 var metaworker = function(options){
 
+	var workerId = (typeof(options.workerId)=='number')?options.workerId:0;
 	var workerType = (options.workerType=="ajax"||options.workerType=="local")?options.workerType:"local"; // ajax | local
 	var debuggingEnabled = options.debug;
 	var path = "";
@@ -124,7 +94,7 @@ var metaworker = function(options){
 		if(debuggingEnabled==true) {
 			console.log("Worker starting in AJAX mode.");
 		}
-		var worker = AJAXWorker(options.serverURL);
+		var worker = AJAXWorker(options.servers,workerId);
 	} else {
 		if(debuggingEnabled==true) {
 			console.log("Worker starting in local mode.");
@@ -208,21 +178,22 @@ var metaworker = function(options){
 				var nextWorkChunk = (chunks.splice(0,1))[0];
 
 				if(nextWorkChunk.length > 0){
-					(function(chunk){
+					(function(chunk, workerId){
 						var chunkIndex = Math.round(Math.random()*10000000);
 
 						// spawn a sub-worker to process this chunk
 						if(debuggingEnabled==true) {
-							console.log("Spawning mapper #"+chunkIndex);
+							console.log("Spawning mapper #"+chunkIndex+" index="+workerId);
 						}
 
 						workerPool.push(
 							metaworker({
+								workerId:workerId,
 								debug:debuggingEnabled,
 								mapper: options.mapper,
 								work: chunk,
 								globals: options.globals,
-								serverURL:options.serverURL,
+								servers:options.servers,
 								workerType:workerType,
 								callback: function(result){
 									if(debuggingEnabled==true) {
@@ -279,7 +250,7 @@ var metaworker = function(options){
 								}
 							})
 						);
-					})(nextWorkChunk);
+					})(nextWorkChunk, i);
 				} else {
 					if(debuggingEnabled==true) {
 						console.log("next work chunk is empty, stopping");
@@ -322,4 +293,42 @@ var metaworker = function(options){
 			}
 		}
 	};
+};
+
+
+
+
+
+var AJAXWorker = function(servers, workerIndex){
+	var payload = null;
+	var chooseServer = function(){
+		return servers[workerIndex % servers.length];
+	};
+	var self = {
+		postMessage:function(msg){
+			if(msg.type=='payload'){
+				payload = msg;
+			} else if (msg.type=="start"){
+				if(!window['jQuery']){
+					throw "jQuery required. Please ensure you have jQuery loaded before using the ajax worker type";
+				}
+				//
+				// Note; we use JSONP so that we can distribute work amongst multiple servers on multiple domains
+				//
+				jQuery.getJSON(chooseServer()+"metaworker.json?rnd="+Math.random()+"&payload="+encodeURIComponent(JSON.stringify(payload))+"&format=json&jsoncallback=?",function(data){
+					self.onmessage({
+						data:{
+							payload:data,
+							type:'data'
+						}
+					});
+				});
+				return;
+			}
+		},
+		terminate:function(){
+			// do nothing. AJAX workers don't need termination
+		}
+	};
+	return self;
 };

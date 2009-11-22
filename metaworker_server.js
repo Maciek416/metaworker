@@ -81,6 +81,17 @@ var allowedFiles = {
 };
 
 var workerUnitCount = 0;
+var port = 8000;
+// search for a port parameter in the arguments
+for(var i=0;i<process.ARGV.length;i++){
+	if(process.ARGV[i].indexOf("port=")==0){
+		if(parseInt(process.ARGV[i].split("port=")[1]) > 0){
+			port = parseInt(process.ARGV[i].split("port=")[1]);
+		} else {
+			throw "Invalid port specified";
+		}
+	}
+}
 
 http.createServer(function (req, res) {
 
@@ -110,7 +121,10 @@ http.createServer(function (req, res) {
 		sys.puts("Completing work unit "+workerUnitCount);
 		var result = func.apply(this,payload.args);
 		var body = JSON.stringify(result);
-		res.sendHeader(200, {"Content-Length": body.length, "Content-Type": "application/json"});
+		if(req.uri.params.format=="json"){
+			body = req.uri.params.jsoncallback + "(" + body + ")";
+		}
+		res.sendHeader(200, {"Content-Length": body.length, "Content-Type": "application/x-javascript"});
 		res.sendBody(body);
 		res.finish();
 
@@ -130,6 +144,6 @@ http.createServer(function (req, res) {
 
 	}
 
-}).listen(8000);
+}).listen(port);
 
-sys.puts('Server running at http://127.0.0.1:8000/');
+sys.puts('Server running at http://127.0.0.1:'+port+'/');
