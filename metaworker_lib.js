@@ -126,6 +126,13 @@ var metaworker = function(options){
 		worker.terminate();
 	};
 
+  if(options.randomize == true){
+    function randOrd(){
+      return (Math.round(Math.random())-0.5); 
+    } 
+    options.work.sort(randOrd);
+  }
+
 	//
 	// We can run a worker in two modes: 
 	// 1) parallel, in which case the work is partitioned and multiple workers
