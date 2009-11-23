@@ -127,10 +127,7 @@ var metaworker = function(options){
 	};
 
   if(options.randomize == true){
-    function randOrd(){
-      return (Math.round(Math.random())-0.5); 
-    } 
-    options.work.sort(randOrd);
+    options.work.sort(function() { return (Math.round(Math.random())-0.5); });
   }
 
 	//
