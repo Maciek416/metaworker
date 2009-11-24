@@ -159,6 +159,7 @@
 			servers:["http://127.0.0.1:8000/"],
 			maxWorkers:(document.location.href.indexOf("workerType=ajax")>-1)?6:2,
 			mapper: mandelRow,
+			randomize:true,
 			partitionSize:(document.location.href.indexOf("workerType=ajax")>-1)?12:24,
 			onIntermediateResults: function(intermediate_results){
 				for(var i=0;i<intermediate_results.length;i++){

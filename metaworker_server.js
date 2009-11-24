@@ -77,6 +77,7 @@ var allowedFiles = {
 	'metaworker_lib.js':true,
 	'metaworker.js':true,
 	'fractal_example.html':true,
+	'block_filler_example.html':true,
 	'index.html':true
 };
 
