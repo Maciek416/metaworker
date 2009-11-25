@@ -126,9 +126,9 @@ var metaworker = function(options){
 		worker.terminate();
 	};
 
-  if(options.randomize == true){
-    options.work.sort(function() { return (Math.round(Math.random())-0.5); });
-  }
+	if(options.randomize == true){
+		options.work.sort(function() { return (Math.round(Math.random())-0.5); });
+	}
 
 	//
 	// We can run a worker in two modes: 
@@ -171,6 +171,10 @@ var metaworker = function(options){
 
 			for(var i=0;i<maxMappers;i++){
 				
+				if(activeMappers >= maxMappers){
+					break;
+				}
+				
 				if(chunks.length == 0){
 					if(debuggingEnabled==true) {
 						console.log("Completed all work chunks, no work left.");
@@ -178,7 +182,8 @@ var metaworker = function(options){
 					break;
 				}
 			
-				// TODO: is biting off pieces of the array like this the best idea?
+				// We bite off chunks of the work because that way we can potentially attack
+				// the work in random order without having to worry.
 				var nextWorkChunk = (chunks.splice(0,1))[0];
 
 				if(nextWorkChunk.length > 0){
@@ -239,13 +244,13 @@ var metaworker = function(options){
 										options.callback(reducedChunks);
 									} else {
 										// if we're not done yet and we've run out of workers, spawn more workers
-										if(activeMappers==0){
-											if(debuggingEnabled==true) {
-												console.log("Expended worker pool, spawning new workers");
-											}
-											var workerPool = getMoreWorkers();
-											startWorkerPool(workerPool);
+										// if(activeMappers==0){
+										if(debuggingEnabled==true) {
+											console.log("Spawning new workers, current concurrent workers = ",activeMappers);
 										}
+										var newWorkers = getMoreWorkers();
+										startWorkerPool(newWorkers);
+										// }
 									}
 
 									if(debuggingEnabled==true) {
@@ -303,12 +308,15 @@ var metaworker = function(options){
 
 
 
+
+
 var AJAXWorker = function(servers, workerIndex){
 	var payload = null;
 	var chooseServer = function(){
 		return servers[workerIndex % servers.length];
 	};
 	var self = {
+		type:'ajax',
 		postMessage:function(msg){
 			if(msg.type=='payload'){
 				payload = msg;

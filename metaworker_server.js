@@ -82,6 +82,8 @@ var allowedFiles = {
 };
 
 var workerUnitCount = 0;
+var concurrency = 0;
+
 var port = 8000;
 // search for a port parameter in the arguments
 for(var i=0;i<process.ARGV.length;i++){
@@ -110,6 +112,7 @@ http.createServer(function (req, res) {
 
 	} else if (req.uri.path == "/metaworker.json") {
 		workerUnitCount++;
+		concurrency++;
 
 		var d1 = new Date();
 		var startTime = d1.getTime();
@@ -119,7 +122,7 @@ http.createServer(function (req, res) {
 		//
 		var payload = JSON.parse(req.uri.params.payload);
 		var func = eval("(" + payload.func + ")");
-		sys.puts("Completing work unit "+workerUnitCount);
+		// sys.puts("Completing work unit "+workerUnitCount);
 		var result = func.apply(this,payload.args);
 		var body = JSON.stringify(result);
 		if(req.uri.params.format=="json"){
@@ -131,7 +134,8 @@ http.createServer(function (req, res) {
 
 		var d2 = new Date();
 		var endTime = d2.getTime();
-		sys.puts("Completed work unit "+workerUnitCount+" in "+(d2-d1)+"ms");
+		sys.puts("concurrency: "+concurrency+" :: Completed work unit "+workerUnitCount+" in "+(d2-d1)+"ms");
+		concurrency--;
 
 	} else {
 
