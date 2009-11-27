@@ -116,25 +116,39 @@ http.createServer(function (req, res) {
 
 		var d1 = new Date();
 		var startTime = d1.getTime();
+		var body;
 
-		//
-		// Complete a metaworker work unit
-		//
-		var payload = JSON.parse(req.uri.params.payload);
-		var func = eval("(" + payload.func + ")");
-		// sys.puts("Completing work unit "+workerUnitCount);
-		var result = func.apply(this,payload.args);
-		var body = JSON.stringify(result);
-		if(req.uri.params.format=="json"){
-			body = req.uri.params.jsoncallback + "(" + body + ")";
+		try {
+			//
+			// Complete a metaworker work unit
+			//
+			var payload = JSON.parse(req.uri.params.payload);
+			var func = eval("(" + payload.func + ")");
+			// sys.puts("Completing work unit "+workerUnitCount);
+			var result = func.apply(this,payload.args);
+			body = JSON.stringify(result);
+			if(req.uri.params.format=="json"){
+				body = req.uri.params.jsoncallback + "(" + body + ")";
+			}
+			res.sendHeader(200, {"Content-Length": body.length, "Content-Type": "application/x-javascript"});
+
+			var d2 = new Date();
+			var endTime = d2.getTime();
+			sys.puts("Completed work unit "+workerUnitCount+" in "+(d2-d1)+"ms");
+
+		} catch(e) {
+
+			var errorWrapper = {msg:e};
+			body = JSON.stringify(errorWrapper);
+			res.sendHeader(500, {"Content-Length": body.length, "Content-Type": "application/x-javascript"});
+			var d2 = new Date();
+			var endTime = d2.getTime();
+			sys.puts("!!! Work unit "+workerUnitCount+" failed after "+(d2-d1)+"ms Error message: " + e);
+
 		}
-		res.sendHeader(200, {"Content-Length": body.length, "Content-Type": "application/x-javascript"});
+
 		res.sendBody(body);
 		res.finish();
-
-		var d2 = new Date();
-		var endTime = d2.getTime();
-		sys.puts("concurrency: "+concurrency+" :: Completed work unit "+workerUnitCount+" in "+(d2-d1)+"ms");
 		concurrency--;
 
 	} else {

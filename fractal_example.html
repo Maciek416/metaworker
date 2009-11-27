@@ -8,7 +8,7 @@
 	
 	<body style="background-color:#fff">
 		<h1>metaworker examples - mandelbrot fractal</h1>
-		<pre id="counter"></pre>
+		<pre id="clock"></pre>
 		<div id="images"></div>
 		<canvas id="canv" width="512" height="512" style="border:7px solid black; background-color:#111111;"></canvas>
 	</body>
@@ -19,6 +19,12 @@
 		// This is a map function
 		//
 		var mandelRow = function(work) {
+			//
+			// To see how fault-tolerance works, uncomment the following line to get about half
+			// of the mandelRows to fail
+			//
+			// if(Math.random() > 0.5) throw "random error generated on purpose from mandelRow";
+
 			var results = [];
 			for(var w=0;w<work.length;w++){
 				var config = work[w];
@@ -147,12 +153,12 @@
 			y = y + dy;
 		}
 		
-		var counter = 0;
-		setInterval(function(){
-			document.getElementById("counter").innerHTML = (new Date()).toString();
-			counter++;
-		},1000);
-		
+		var updateClockDisplay = function(){
+			document.getElementById("clock").innerHTML = (new Date()).toString();
+		};
+		setInterval(updateClockDisplay,1000);
+		updateClockDisplay();
+
 		var w = metaworker({
 			workerType:(document.location.href.indexOf("workerType=ajax")>-1)?"ajax":"local",
 			// this is only used if workerType=="ajax"

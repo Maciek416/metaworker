@@ -26,11 +26,11 @@
 //
 // TODO:
 //
+//  * allow control of partitioning
+//  * allow partitioning and k/v handling to work more like canonical MR example
 //  * we need an example that does word counts
-//  * allow user to control number of simultaneous threads
 //  * allow user to force reduction to happen in a worker
 //  * rewrite fractal example to use above option
-//  * don't wait until number of workers is 0 before spawning more workers, keep the worker count steady
 //  * test Safari support and implement JSON conversions if necessary
 //  * validate paths
 //  * validate work input types as array objects when in parallel mode
@@ -121,7 +121,7 @@ var metaworker = function(options){
 			if(debuggingEnabled==true) {
 				console.error("metaworker failed to complete work and returned an error:",error);
 			}
-			options.error(error.message);
+			options.error(error);
 		}
 		worker.terminate();
 	};
@@ -197,13 +197,32 @@ var metaworker = function(options){
 
 						workerPool.push(
 							metaworker({
-								workerId:workerId,
-								debug:debuggingEnabled,
+								workerId: workerId,
+								debug: debuggingEnabled,
 								mapper: options.mapper,
 								work: chunk,
 								globals: options.globals,
-								servers:options.servers,
-								workerType:workerType,
+								servers: options.servers,
+								workerType: workerType,
+								error: function(error){
+									//
+									// TODO: check the result and check what kind of failure we got.
+									// TODO: each chunk needs a GUID so that we can check how many
+									//       times it has been retried. 
+									//
+
+									if(debuggingEnabled==true) {
+										console.log("Mapper #"+chunkIndex+" failed (reason:",error,") re-inserting failed chunk back into chunk list.");
+									}
+
+									// Resubmit the chunk we had back into the chunks list
+									chunks.push(chunk);
+									activeMappers--;
+
+									// Trigger a worker request in case we're at the end or at least keep the pipeline full
+									var newWorkers = getMoreWorkers();
+									startWorkerPool(newWorkers);
+								},
 								callback: function(result){
 									if(debuggingEnabled==true) {
 										console.log("Mapper #"+chunkIndex+" has returned data");
@@ -243,14 +262,14 @@ var metaworker = function(options){
 									if(numReturnedChunks==numTotalChunks){
 										options.callback(reducedChunks);
 									} else {
+										
 										// if we're not done yet and we've run out of workers, spawn more workers
-										// if(activeMappers==0){
 										if(debuggingEnabled==true) {
 											console.log("Spawning new workers, current concurrent workers = ",activeMappers);
 										}
+										
 										var newWorkers = getMoreWorkers();
 										startWorkerPool(newWorkers);
-										// }
 									}
 
 									if(debuggingEnabled==true) {
@@ -289,7 +308,7 @@ var metaworker = function(options){
 	}
 	
 	return {
-		start:function(){
+		start: function(){
 			if(options.parallel){
 				if(debuggingEnabled==true) {
 					console.log("Starting workers..");
@@ -317,28 +336,58 @@ var AJAXWorker = function(servers, workerIndex){
 	};
 	var self = {
 		type:'ajax',
-		postMessage:function(msg){
+		postMessage: function(msg){
 			if(msg.type=='payload'){
 				payload = msg;
 			} else if (msg.type=="start"){
 				if(!window['jQuery']){
 					throw "jQuery required. Please ensure you have jQuery loaded before using the ajax worker type";
 				}
-				//
-				// Note; we use JSONP so that we can distribute work amongst multiple servers on multiple domains
-				//
-				jQuery.getJSON(chooseServer()+"metaworker.json?rnd="+Math.random()+"&payload="+encodeURIComponent(JSON.stringify(payload))+"&format=json&jsoncallback=?",function(data){
-					self.onmessage({
-						data:{
-							payload:data,
-							type:'data'
-						}
-					});
+				// //
+				// // Note; we use JSONP so that we can distribute work amongst multiple servers on multiple domains
+				// //
+				// jQuery.getJSON(chooseServer()+"metaworker.json?rnd="+Math.random()+"&payload="+encodeURIComponent(JSON.stringify(payload))+"&format=json&jsoncallback=?",
+				// 	function(data){
+				// 		self.onmessage({
+				// 			data:{
+				// 				payload:data,
+				// 				type:'data'
+				// 			}
+				// 		});
+				// });
+				jQuery.ajax({
+					url: chooseServer()+"metaworker.json?rnd="+Math.random()+"&payload="+encodeURIComponent(JSON.stringify(payload))+"&format=json&jsoncallback=?",
+					dataType: 'jsonp',
+					success: function(data){
+						self.onmessage({
+							data:{
+								payload:data,
+								type:'data'
+							}
+						});
+					},
+					error: function(XHRObject, textStatus, errorThrown){
+						// textStatus : timeout, error, notmodified, parseerror
+						self.onerror(textStatus);
+					}
 				});
+					
+				/*	
+					chooseServer()+"metaworker.json?rnd="+Math.random()+"&payload="+encodeURIComponent(JSON.stringify(payload))+"&format=json&jsoncallback=?",
+					function(data){
+						self.onmessage({
+							data:{
+								payload:data,
+								type:'data'
+							}
+						});
+				});
+				*/
+				
 				return;
 			}
 		},
-		terminate:function(){
+		terminate: function(){
 			// do nothing. AJAX workers don't need termination
 		}
 	};
